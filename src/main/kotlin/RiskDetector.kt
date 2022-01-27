@@ -3,9 +3,13 @@ package org.laolittle.plugin
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import net.mamoe.mirai.Bot
+import net.mamoe.mirai.alsoLogin
+import net.mamoe.mirai.console.MiraiConsole
 import net.mamoe.mirai.console.command.CommandManager.INSTANCE.register
+import net.mamoe.mirai.console.plugin.PluginManager
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
+import net.mamoe.mirai.console.util.ConsoleExperimentalApi
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
@@ -28,7 +32,8 @@ object RiskDetector : KotlinPlugin(
     }
 ) {
     private val bots = mutableSetOf<Bot>()
-    @OptIn(ExperimentalSerializationApi::class)
+
+    @OptIn(ExperimentalSerializationApi::class, ConsoleExperimentalApi::class)
     val task by lazy {
         timerTask {
             runBlocking {
@@ -43,10 +48,23 @@ object RiskDetector : KotlinPlugin(
                         cost
                     }?.run {
                         if (this >= RiskDetectorConfig.duration) {
-                            File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }?.deleteRecursively()
-                            bot.login()
-                            logger.info { "$bot 疑似被风控, 已自动删除缓存并重新登录" }
-                        }else logger.info { "$bot 通过检测" }
+                            logger.info { "$bot 疑似被风控" }
+                            bot.close()
+                            logger.info {
+                                "删除$bot 缓存, 结果为: ${
+                                    File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }
+                                        ?.deleteRecursively() ?: false
+                                }"
+                            }
+                            AutoLoginData.accounts.first { it.account == bot.id }.apply {
+                                if (password.kind == PasswordKind.MD5)
+                                    MiraiConsole.addBot(account, password.value) botConfig@{
+                                        protocol = configuration.protocol
+                                        fileBasedDeviceInfo(configuration.device)
+                                    }.alsoLogin()
+                            }
+                            logger.info { "$bot 已自动重新登录" }
+                        } else logger.info { "$bot 通过检测" }
                     } ?: logger.error { "检测失败, 无法找到可以发送消息的群" }
                 }
             }
@@ -54,6 +72,8 @@ object RiskDetector : KotlinPlugin(
     }
 
     override fun onEnable() {
+        AutoLoginData.reload()
+        println(AutoLoginData.accounts)
         RiskDetectorConfig.reload()
         RiskDetectCommand.register()
         logger.info { "Plugin loaded" }
@@ -64,6 +84,12 @@ object RiskDetector : KotlinPlugin(
             bots.remove(bot)
         }
         Timer().schedule(task, Date(), RiskDetectorConfig.interval * 60 * 1000)
+    }
+
+    init {
+        PluginManager.pluginsConfigFolder.resolve("Console").resolve("AutoLogin.yml").readBytes().apply {
+            dataFolder.resolve("AutoLogin.yml").writeBytes(this)
+        }
     }
 }
 
