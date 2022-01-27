@@ -33,11 +33,12 @@ object RiskDetectCommand : CompositeCommand(
                 }"
             }
             AutoLoginData.accounts.first { it.account == bot.id }.apply {
-                if (password.kind == PasswordKind.MD5)
+                if (password.kind != PasswordKind.MD5)
                     MiraiConsole.addBot(account, password.value) botConfig@{
                         protocol = configuration.protocol
                         fileBasedDeviceInfo(configuration.device)
                     }.alsoLogin()
+                else logger.error { "暂不支持MD5!" }
             }
             RiskDetector.logger.info { "$bot 已自动重新登录" }
         } else logger.error { "请输入Bot号码" }

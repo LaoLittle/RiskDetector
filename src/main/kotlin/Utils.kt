@@ -13,7 +13,7 @@ internal inline fun <R> retryWhenFailed(limit: Int, block: () -> R): R? {
         callsInPlace(block, InvocationKind.AT_LEAST_ONCE)
     }
     repeat(limit) {
-        runCatching { return block() }
+        runCatching { return block() }.onFailure { RiskDetector.logger.error(it) }
     }
     return null
 }

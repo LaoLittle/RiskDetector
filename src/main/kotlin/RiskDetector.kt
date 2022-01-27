@@ -42,7 +42,7 @@ object RiskDetector : KotlinPlugin(
                     val cost = measureTimeMillis {
                         receipt =
                             (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
-                    } - ping()
+                    }
                     runCatching { receipt.recall() }
                     cost
                 }?.run {
@@ -65,11 +65,12 @@ object RiskDetector : KotlinPlugin(
                             }"
                         }
                         AutoLoginData.accounts.first { it.account == bot.id }.apply {
-                            if (password.kind == PasswordKind.MD5)
+                            if (password.kind != PasswordKind.MD5)
                                 MiraiConsole.addBot(account, password.value) botConfig@{
                                     protocol = configuration.protocol
                                     fileBasedDeviceInfo(configuration.device)
                                 }.alsoLogin()
+                            else logger.error { "暂不支持MD5!" }
                         }
                         logger.info { "$bot 已自动重新登录" }
                     } else logger.info { "$bot 通过检测" }
@@ -80,7 +81,6 @@ object RiskDetector : KotlinPlugin(
 
     override fun onEnable() {
         AutoLoginData.reload()
-        println(AutoLoginData.accounts)
         RiskDetectorConfig.reload()
         RiskDetectCommand.register()
         logger.info { "Plugin loaded" }
