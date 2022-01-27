@@ -1,6 +1,5 @@
 package org.laolittle.plugin
 
-import kotlinx.serialization.json.Json
 import java.net.InetAddress
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -23,11 +22,4 @@ internal fun ping(ipAddress: String = "www.qq.com"): Long {
     return measureTimeMillis {
         InetAddress.getByName(ipAddress).isReachable(3000)
     }
-}
-
-internal val Json = Json {
-    prettyPrint = true
-    ignoreUnknownKeys = true
-    isLenient = true
-    allowStructuredMapKeys = true
 }

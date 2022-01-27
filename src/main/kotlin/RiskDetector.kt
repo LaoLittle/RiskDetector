@@ -34,39 +34,46 @@ object RiskDetector : KotlinPlugin(
     private val bots = mutableSetOf<Bot>()
 
     @OptIn(ExperimentalSerializationApi::class, ConsoleExperimentalApi::class)
-    val task by lazy {
-        timerTask {
-            runBlocking {
-                bots.forEach { bot ->
-                    retryWhenFailed(bot.groups.size) {
-                        val receipt: MessageReceipt<Group>
-                        val cost = measureTimeMillis {
-                            receipt =
-                                (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
-                        } - ping()
-                        runCatching { receipt.recall() }
-                        cost
-                    }?.run {
-                        if (this >= RiskDetectorConfig.duration) {
-                            logger.info { "$bot 疑似被风控" }
-                            bot.close()
-                            logger.info {
-                                "删除$bot 缓存, 结果为: ${
-                                    File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }
-                                        ?.deleteRecursively() ?: false
-                                }"
+    val task = timerTask {
+        runBlocking {
+            bots.forEach { bot ->
+                retryWhenFailed(bot.groups.size) {
+                    val receipt: MessageReceipt<Group>
+                    val cost = measureTimeMillis {
+                        receipt =
+                            (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
+                    } - ping()
+                    runCatching { receipt.recall() }
+                    cost
+                }?.run {
+                    if (this >= RiskDetectorConfig.duration) {
+                        logger.info { "$bot 疑似被风控" }
+                        mutableSetOf<Long>().apply {
+                            AutoLoginData.accounts.forEach {
+                                add(it.account)
                             }
-                            AutoLoginData.accounts.first { it.account == bot.id }.apply {
-                                if (password.kind == PasswordKind.MD5)
-                                    MiraiConsole.addBot(account, password.value) botConfig@{
-                                        protocol = configuration.protocol
-                                        fileBasedDeviceInfo(configuration.device)
-                                    }.alsoLogin()
+                            if (bot.id !in this) {
+                                logger.error { "自动登录配置中未找到此Bot, 将不会重新登录" }
+                                return@run
                             }
-                            logger.info { "$bot 已自动重新登录" }
-                        } else logger.info { "$bot 通过检测" }
-                    } ?: logger.error { "检测失败, 无法找到可以发送消息的群" }
-                }
+                        }
+                        bot.close()
+                        logger.info {
+                            "删除$bot 缓存, 结果为: ${
+                                File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }
+                                    ?.deleteRecursively() ?: false
+                            }"
+                        }
+                        AutoLoginData.accounts.first { it.account == bot.id }.apply {
+                            if (password.kind == PasswordKind.MD5)
+                                MiraiConsole.addBot(account, password.value) botConfig@{
+                                    protocol = configuration.protocol
+                                    fileBasedDeviceInfo(configuration.device)
+                                }.alsoLogin()
+                        }
+                        logger.info { "$bot 已自动重新登录" }
+                    } else logger.info { "$bot 通过检测" }
+                } ?: logger.error { "检测失败, 无法找到可以发送消息的群" }
             }
         }
     }
