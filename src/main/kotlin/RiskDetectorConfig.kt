@@ -9,8 +9,5 @@ object RiskDetectorConfig : ReadOnlyPluginConfig("Config") {
     val groupId by value(123456L)
 
     @ValueDescription("检测间隔 (单位: 分)")
-    val interval by value(20L)
-
-    @ValueDescription("风控消息时间阈值 (单位: 毫秒)")
-    val duration by value(2000L)
+    val interval by value(0L)
 }

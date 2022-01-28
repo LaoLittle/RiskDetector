@@ -28,8 +28,7 @@ object RiskDetectCommand : CompositeCommand(
             bot.close()
             RiskDetector.logger.info {
                 "删除$bot 缓存, 结果为: ${
-                    File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }
-                        ?.deleteRecursively() ?: false
+                    File("bots/${bot.id}").resolve("cache").deleteRecursively()
                 }"
             }
             AutoLoginData.accounts.first { it.account == bot.id }.apply {

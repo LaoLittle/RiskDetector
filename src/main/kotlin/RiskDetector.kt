@@ -10,17 +10,14 @@ import net.mamoe.mirai.console.plugin.PluginManager
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.console.util.ConsoleExperimentalApi
-import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.BotOfflineEvent
 import net.mamoe.mirai.event.events.BotOnlineEvent
 import net.mamoe.mirai.event.globalEventChannel
-import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.utils.error
 import net.mamoe.mirai.utils.info
 import java.io.File
 import java.util.*
 import kotlin.concurrent.timerTask
-import kotlin.system.measureTimeMillis
 
 object RiskDetector : KotlinPlugin(
     JvmPluginDescription(
@@ -38,30 +35,24 @@ object RiskDetector : KotlinPlugin(
         runBlocking {
             bots.forEach { bot ->
                 retryWhenFailed(bot.groups.size) {
-                    val receipt: MessageReceipt<Group>
-                    val cost = measureTimeMillis {
-                        receipt =
-                            (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
-                    }
-                    runCatching { receipt.recall() }
-                    cost
-                }?.run {
-                    if (this >= RiskDetectorConfig.duration) {
+                    val receipt =
+                        (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
+
+                    runCatching { receipt.recall() }.onSuccess { logger.info { "$bot 通过检测" } }.onFailure {
                         logger.info { "$bot 疑似被风控" }
                         mutableSetOf<Long>().apply {
                             AutoLoginData.accounts.forEach {
                                 add(it.account)
                             }
                             if (bot.id !in this) {
-                                logger.error { "自动登录配置中未找到此Bot, 将不会重新登录" }
-                                return@run
+                                logger.error { "自动登录配置中未找到$bot, 将不会重新登录" }
+                                return@runBlocking
                             }
                         }
                         bot.close()
                         logger.info {
                             "删除$bot 缓存, 结果为: ${
-                                File("bots/${bot.id}").resolve("cache").takeIf { it.isDirectory }
-                                    ?.deleteRecursively() ?: false
+                                File("bots/${bot.id}").resolve("cache").deleteRecursively()
                             }"
                         }
                         AutoLoginData.accounts.first { it.account == bot.id }.apply {
@@ -73,7 +64,8 @@ object RiskDetector : KotlinPlugin(
                             else logger.error { "暂不支持MD5!" }
                         }
                         logger.info { "$bot 已自动重新登录" }
-                    } else logger.info { "$bot 通过检测" }
+
+                    }
                 } ?: logger.error { "检测失败, 无法找到可以发送消息的群" }
             }
         }
@@ -90,7 +82,8 @@ object RiskDetector : KotlinPlugin(
         globalEventChannel().subscribeAlways<BotOfflineEvent> {
             bots.remove(bot)
         }
-        Timer().schedule(task, Date(), RiskDetectorConfig.interval * 60 * 1000)
+        if (RiskDetectorConfig.interval > 0)
+            Timer().schedule(task, Date(), RiskDetectorConfig.interval * 60 * 1000)
     }
 
     init {
@@ -99,4 +92,3 @@ object RiskDetector : KotlinPlugin(
         }
     }
 }
-
