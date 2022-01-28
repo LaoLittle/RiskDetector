@@ -19,7 +19,7 @@ object RiskDetector : KotlinPlugin(
     JvmPluginDescription(
         id = "org.laolittle.plugin.RiskDetector",
         name = "RiskDetector",
-        version = "1.0",
+        version = "1.0.1",
     ) {
         author("LaoLittle")
     }
