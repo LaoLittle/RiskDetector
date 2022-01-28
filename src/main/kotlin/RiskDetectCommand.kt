@@ -32,12 +32,13 @@ object RiskDetectCommand : CompositeCommand(
         logger.info {
             "删除$bot 缓存, 结果为: ${bot.configuration.cacheDir.deleteRecursively()}"
         }
-        try {
+
+        runCatching {
             with(BuiltInCommands.LoginCommand) {
                 handle(id = bot.id)
             }
             logger.info { "$bot 已自动重新登录" }
-        } catch (cause: Throwable) {
+        }.onFailure {
             logger.warning { "$bot 重新登陆失败" }
         }
     }

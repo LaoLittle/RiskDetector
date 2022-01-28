@@ -41,13 +41,14 @@ object RiskDetector : KotlinPlugin(
                         logger.info {
                             "删除$bot 缓存, 结果为: ${bot.configuration.cacheDir.deleteRecursively()}"
                         }
+
                         with(ConsoleCommandSender) {
-                            try {
+                            runCatching {
                                 with(BuiltInCommands.LoginCommand) {
                                     handle(id = bot.id)
                                 }
                                 logger.info { "$bot 已自动重新登录" }
-                            } catch (cause: Throwable) {
+                            }.onFailure {
                                 logger.warning { "$bot 重新登陆失败" }
                             }
                         }
@@ -60,6 +61,7 @@ object RiskDetector : KotlinPlugin(
     override fun onEnable() {
         RiskDetectorConfig.reload()
         RiskDetectCommand.register()
+
         if (RiskDetectorConfig.interval > 0) {
             Timer().schedule(task, Date(), RiskDetectorConfig.interval * 60 * 1000)
         }
