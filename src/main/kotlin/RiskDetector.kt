@@ -9,6 +9,7 @@ import net.mamoe.mirai.console.command.ConsoleCommandSender
 import net.mamoe.mirai.console.plugin.jvm.JvmPluginDescription
 import net.mamoe.mirai.console.plugin.jvm.KotlinPlugin
 import net.mamoe.mirai.console.util.ConsoleExperimentalApi
+import net.mamoe.mirai.contact.isBotMuted
 import net.mamoe.mirai.utils.error
 import net.mamoe.mirai.utils.info
 import net.mamoe.mirai.utils.warning
@@ -31,9 +32,10 @@ object RiskDetector : KotlinPlugin(
             for (bot in Bot.instances) {
                 if (!bot.isOnline) continue
 
-                retryWhenFailed(bot.groups.size) {
+                retryWhenFailed(bot.groups.filter { !it.isBotMuted }.size) {
                     val receipt =
-                        (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.random()).sendMessage("风控检测")
+                        (bot.getGroup(RiskDetectorConfig.groupId) ?: bot.groups.filter { !it.isBotMuted }
+                            .random()).sendMessage("风控检测")
 
                     runCatching { receipt.recall() }.onSuccess { logger.info { "$bot 通过检测" } }.onFailure {
                         logger.info { "$bot 疑似被风控" }
@@ -45,15 +47,18 @@ object RiskDetector : KotlinPlugin(
                         with(ConsoleCommandSender) {
                             runCatching {
                                 with(BuiltInCommands.LoginCommand) {
-                                    handle(id = bot.id)
+                                    handle(
+                                        id = bot.id,
+                                        protocol = bot.configuration.protocol
+                                    )
                                 }
-                                logger.info { "$bot 已自动重新登录" }
+                                logger.info { "${Bot.getInstance(bot.id)} 已自动重新登录" }
                             }.onFailure {
                                 logger.warning { "$bot 重新登陆失败" }
                             }
                         }
                     }
-                } ?: logger.error { "检测失败, 无法找到可以发送消息的群" }
+                } ?: logger.error { "$bot 检测失败, 无法找到可以发送消息的群" }
             }
         }
     }

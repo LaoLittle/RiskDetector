@@ -35,7 +35,10 @@ object RiskDetectCommand : CompositeCommand(
 
         runCatching {
             with(BuiltInCommands.LoginCommand) {
-                handle(id = bot.id)
+                handle(
+                    id = bot.id,
+                    protocol = bot.configuration.protocol
+                )
             }
             logger.info { "$bot 已自动重新登录" }
         }.onFailure {
