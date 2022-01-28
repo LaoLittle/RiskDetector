@@ -56,12 +56,12 @@ object RiskDetector : KotlinPlugin(
                             }"
                         }
                         AutoLoginData.accounts.first { it.account == bot.id }.apply {
-                            if (password.kind != PasswordKind.MD5)
+                            if (password.kind == PasswordKind.PLAIN)
                                 MiraiConsole.addBot(account, password.value) botConfig@{
                                     protocol = configuration.protocol
                                     fileBasedDeviceInfo(configuration.device)
                                 }.alsoLogin()
-                            else logger.error { "暂不支持MD5!" }
+                            else logger.error { "暂不支持非PLAIN!" }
                         }
                         logger.info { "$bot 已自动重新登录" }
 
